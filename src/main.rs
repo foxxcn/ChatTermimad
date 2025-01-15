@@ -159,62 +159,62 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .set_fg(termimad::crossterm::style::Color::Green);
 
         while let Some(chunk) = response.chunk().await? {
-            if let Ok(text) = String::from_utf8(chunk.to_vec()) {
-                for line in text.lines() {
-                    if let Some(data) = line.strip_prefix("data: ") {
-                        if data == "[DONE]" {
-                            continue;
-                        }
+            // 使用 String::from_utf8_lossy 来处理无效的 UTF-8 数据
+            let text = String::from_utf8_lossy(&chunk);
+            for line in text.lines() {
+                if let Some(data) = line.strip_prefix("data: ") {
+                    if data == "[DONE]" {
+                        continue;
+                    }
 
-                        if let Ok(response) = serde_json::from_str::<ApiResponse>(data) {
-                            if let Some(content) = response
-                                .choices
-                                .first()
-                                .and_then(|choice| choice.delta.as_ref())
-                                .and_then(|delta| delta.content.as_ref())
-                            {
-                                // 处理代码块
-                                if content.contains("```") {
-                                    is_code_block = !is_code_block;
-                                    if !buffer.is_empty() {
-                                        print!("\r\x1B[K");
-                                        skin.print_text(&buffer);
-                                        buffer.clear();
-                                    }
-                                    continue;
-                                }
-
-                                // 累积内容
-                                current_line.push_str(content);
-                                accumulated_content.push_str(content);
-
-                                // 检查是否需要渲染
-                                if content.contains('\n') {
-                                    buffer.push_str(&current_line);
-                                    current_line.clear();
-
-                                    // 渲染完整段落或块
-                                    if !buffer.is_empty() {
-                                        print!("\r\x1B[K");
-                                        if is_code_block {
-                                            // 对代码块使用特殊格式化
-                                            buffer = format!("```\n{}\n```", buffer);
-                                        }
-                                        skin.print_text(&buffer);
-                                        buffer.clear();
-                                    }
-                                } else if !is_code_block
-                                    && (content.contains('。')
-                                        || content.contains('!')
-                                        || content.contains('?'))
-                                {
-                                    // 在普通文本中遇到句末标点时渲染
-                                    buffer.push_str(&current_line);
-                                    current_line.clear();
+                    if let Ok(response) = serde_json::from_str::<ApiResponse>(data) {
+                        if let Some(content) = response
+                            .choices
+                            .first()
+                            .and_then(|choice| choice.delta.as_ref())
+                            .and_then(|delta| delta.content.as_ref())
+                        {
+                            // 处理代码块
+                            if content.contains("```") {
+                                is_code_block = !is_code_block;
+                                if !buffer.is_empty() {
                                     print!("\r\x1B[K");
                                     skin.print_text(&buffer);
                                     buffer.clear();
                                 }
+                                continue;
+                            }
+
+                            // 累积内容
+                            current_line.push_str(content);
+                            accumulated_content.push_str(content);
+
+                            // 检查是否需要渲染
+                            if content.contains('\n') {
+                                buffer.push_str(&current_line);
+                                current_line.clear();
+
+                                // 渲染完整段落或块
+                                if !buffer.is_empty() {
+                                    print!("\r\x1B[K");
+                                    if is_code_block {
+                                        // 对代码块使用特殊格式化
+                                        buffer = format!("```\n{}\n```", buffer);
+                                    }
+                                    skin.print_text(&buffer);
+                                    buffer.clear();
+                                }
+                            } else if !is_code_block
+                                && (content.contains('。')
+                                    || content.contains('!')
+                                    || content.contains('?'))
+                            {
+                                // 在普通文本中遇到句末标点时渲染
+                                buffer.push_str(&current_line);
+                                current_line.clear();
+                                print!("\r\x1B[K");
+                                skin.print_text(&buffer);
+                                buffer.clear();
                             }
                         }
                     }
